@@ -35,14 +35,19 @@ int main(int argc, char **argv) {
         perror("open(tar_file)");
         return -1;
     }
-
+    
     //int ret = check_archive(fd);
     //printf("check_archive returned %d\n", ret);
-    int does_exist_nowel = exists(fd, "archive_3_files/nowel.jpg");
-    printf("###############################################################\n #####################################\n");
-    int does_exist_summer = exists(fd, "archive_3_files/summer.jpg");
+    int is_dir_archive = is_dir(fd, "archive_3_files");
+    int is_dir_summer = is_dir(fd, "archive_3_files/summer.jpg");
     
-    printf("exists returned %d for summer and %d for nowel\n", does_exist_summer, does_exist_nowel);
-
+    printf("\n is dir returned %d for archive and %d for summer\n", is_dir_archive, is_dir_summer);
+    printf("\n\n");
+    
+    int is_file_summer = is_file(fd, "archive_3_files/summer.jpg");
+    int is_file_archive = is_file(fd, "archive_3_files");
+    
+    printf("is file returned %d for summer and %d for archive_3\n", is_file_summer, is_file_archive);
+    
     return 0;
 }

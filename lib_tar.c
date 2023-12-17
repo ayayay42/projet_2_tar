@@ -131,7 +131,35 @@ int exists(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_dir(int tar_fd, char *path) {
+    printf("#####\n debugging is_dir\n");
+    char buffer[MAX_HEADER_SIZE];
+
+    lseek(tar_fd, 0, SEEK_SET);
+
+    while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
+        printf("\nnew iteration\n");
+        tar_header_t * header = (tar_header_t *) buffer;
+        if (header->name[0] == '\0')
+        {
+            printf("reached end\n\n");
+            lseek(tar_fd, (-1)* strlen(header->name), SEEK_CUR);
+            break;
+        }
+        printf("compare path: %d\n\n", strncmp(header->name, path, strlen(path)));
+        printf("header flag and name: %d, %s\n", header->typeflag, header->name);
+        if (strncmp(header->name, path, strlen(path)) == 0){
+            if (header->typeflag == DIRTYPE){
+                printf("inside if dir\n");
+                return 1;
+            }
+            else printf("outside if dir so not a dir but good path\n");
+        }
+        lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
+
+    }
+    printf("outside while\n");
     return 0;
+    
 }
 
 /**
@@ -144,6 +172,38 @@ int is_dir(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_file(int tar_fd, char *path) {
+    printf("\n\n\n#####\n debugging file\n");
+
+    char buffer[MAX_HEADER_SIZE];
+
+    lseek(tar_fd, 0, SEEK_SET);
+
+    while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
+        printf("\nnew iteration\n");
+        tar_header_t * header = (tar_header_t *) buffer;
+        if (header->name[0] == '\0')
+        {
+            printf("reached end\n\n");
+            lseek(tar_fd, (-1)* strlen(header->name), SEEK_CUR);
+            break;
+        }
+        printf("compare: %d\n\n", strcmp(header->name, path));
+        printf("path is: %s\n", path);
+        printf("header flag and name: %d, %s\n", header->typeflag, header->name);
+        if (strncmp(header->name, path, strlen(path)) == 0){
+            if (header->typeflag == REGTYPE || header->typeflag == AREGTYPE){
+                printf("inside if file\n");
+                return 1;
+            }
+            else {
+                printf("outside if file so not a file but good path\n");
+                break;
+            }
+        }
+        lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
+
+    }
+    printf("outside while\n");
     return 0;
 }
 
