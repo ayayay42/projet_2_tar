@@ -216,6 +216,38 @@ int is_file(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_symlink(int tar_fd, char *path) {
+    printf("\n\n\n#####\n debugging symlink\n");
+
+    char buffer[MAX_HEADER_SIZE];
+
+    lseek(tar_fd, 0, SEEK_SET);
+
+    while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
+        printf("\nnew iteration\n");
+        tar_header_t * header = (tar_header_t *) buffer;
+        if (header->name[0] == '\0')
+        {
+            printf("reached end\n\n");
+            lseek(tar_fd, (-1)* strlen(header->name), SEEK_CUR);
+            break;
+        }
+        printf("compare: %d\n\n", strcmp(header->name, path));
+        printf("path is: %s\n", path);
+        printf("header flag and name: %d, %s\n", header->typeflag, header->name);
+        if (strncmp(header->name, path, strlen(path)) == 0){
+            if (header->typeflag == SYMTYPE){
+                printf("inside if link\n");
+                return 1;
+            }
+            else {
+                printf("outside if link so not a link but good path\n");
+                break;
+            }
+        }
+        lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
+
+    }
+    printf("outside while\n");
     return 0;
 }
 
@@ -243,6 +275,75 @@ int is_symlink(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
+    printf("\n\n\n#####\n debugging list\n");
+
+    char buffer[MAX_HEADER_SIZE];
+
+    long init_position = lseek(tar_fd, 0, SEEK_SET);
+
+    size_t entries_count = 0;
+
+    while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
+        printf("\nnew iteration\n");
+
+        tar_header_t * header = (tar_header_t *) buffer;
+
+        if (header->name[0] == '\0'){
+            printf("reached end\n\n");
+            lseek(tar_fd, (-1)* strlen(header->name), SEEK_CUR);
+            break;
+        }
+
+        printf("compare: %d\n\n", strcmp(header->name, path));
+        printf("path is: %s\n", path);
+        printf("header flag and name: %d, %s\n", header->typeflag, header->name);
+
+        if (strncmp(header->name, path, strlen(path)) == 0){
+            lseek(tar_fd, 0, SEEK_CUR);
+
+            if(header->typeflag == DIRTYPE){
+                printf("inside if dir\n");
+
+                lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
+
+                while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
+                    printf("\nnew iteration in while loop\n");
+
+                    tar_header_t * entry_header = (tar_header_t *) buffer;
+
+                    if (entry_header->name[0] == '\0'){
+                        printf("reached end\n\n");
+                        lseek(tar_fd, (-1)* strlen(entry_header->name), SEEK_CUR);
+                        break;
+                    }
+
+                    printf("compare: %d\n\n", strcmp(entry_header->name, path));
+                    printf("path is: %s\n", path);
+                    printf("header flag and name: %d, %s\n", entry_header->typeflag, entry_header->name);
+
+                    if (strncmp(header->name, path, strlen(path)) == 0 && strlen(entry_header->name) > strlen(path) && entry_header->name[strlen(path)] != '/'){
+                        strncpy(entries[entries_count], entry_header->name, strlen(entry_header->name));
+                        entries_count++;
+
+                        if (entries_count == *no_entries){
+                            lseek(tar_fd, init_position, SEEK_SET);
+                            *no_entries = entries_count;
+                            return entries_count;
+                        }
+                        
+                    }
+                    lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
+                }
+            }
+            lseek(tar_fd, init_position, SEEK_SET);
+
+            *no_entries = entries_count;
+            return entries_count;
+        }
+
+        lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
+    }
+    printf("outside while\n");
     return 0;
 }
 

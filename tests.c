@@ -35,19 +35,25 @@ int main(int argc, char **argv) {
         perror("open(tar_file)");
         return -1;
     }
-    
-    //int ret = check_archive(fd);
-    //printf("check_archive returned %d\n", ret);
+    /*
+    int ret = check_archive(fd);
+    printf("check_archive returned %d\n", ret);
+    */
+    /*
     int is_dir_archive = is_dir(fd, "archive_3_files");
     int is_dir_summer = is_dir(fd, "archive_3_files/summer.jpg");
     
     printf("\n is dir returned %d for archive and %d for summer\n", is_dir_archive, is_dir_summer);
     printf("\n\n");
-    
+    */
+    /*
     int is_file_summer = is_file(fd, "archive_3_files/summer.jpg");
     int is_file_archive = is_file(fd, "archive_3_files");
     
     printf("is file returned %d for summer and %d for archive_3\n", is_file_summer, is_file_archive);
-    
+    */
+
+    int is_link = is_symlink(fd, "my_symlink");
+    printf("is symlink returned %d\n", is_link);
     return 0;
 }
