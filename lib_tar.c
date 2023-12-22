@@ -275,8 +275,8 @@ int is_symlink(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
-  int count = 0;
-  int index = 0;
+  int c = 0;
+  int in = 0;
 
   if (!is_dir(tar_fd, path) && !is_symlink(tar_fd, path)) {
     *no_entries = 0;
@@ -289,11 +289,11 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
   while (1) {
     tar_header_t header;
-    if (pread(tar_fd, &header, sizeof(tar_header_t), count*sizeof(tar_header_t)) < 0) return -1;
+    if (pread(tar_fd, &header, sizeof(tar_header_t), c*sizeof(tar_header_t)) < 0) return -1;
 
     if (!strcmp(header.name, path)) {
       if (header.typeflag == DIRTYPE) {
-        int counter = count + 1; 
+        int counter = c + 1; 
         while (1) {
           tar_header_t entry;
           if (pread(tar_fd, &entry, sizeof(tar_header_t), counter*sizeof(tar_header_t)) < 0) return -1;
@@ -301,13 +301,13 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
           if (!strncmp(entry.name, path, strlen(path))) {
             if (strncmp(entry.name, record, strlen(record))) {
-              memcpy(entries[index], entry.name, strlen(entry.name));
-              index++;
+              memcpy(entries[in], entry.name, strlen(entry.name));
+              in++;
               strcpy(record, entry.name); 
             }
           }
           else if (!(header.typeflag == LNKTYPE || header.typeflag == SYMTYPE)) {
-            *no_entries = index;
+            *no_entries = in;
             return 1;
           }
 
@@ -331,7 +331,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     // tar end
     if (!strlen((char *) &header)) {
       tar_header_t header2;
-      if (pread(tar_fd, &header2, sizeof(tar_header_t), (count+1)*sizeof(tar_header_t)) < 0) return -1;
+      if (pread(tar_fd, &header2, sizeof(tar_header_t), (c+1)*sizeof(tar_header_t)) < 0) return -1;
       
       if (!strlen((char *) &header2)) {
         *no_entries = 0;
@@ -341,10 +341,10 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
 
     // block num
     if (TAR_INT(header.size) % MAX_HEADER_SIZE == 0) {
-      count += (1 + TAR_INT(header.size) / MAX_HEADER_SIZE);
+      c += (1 + TAR_INT(header.size) / MAX_HEADER_SIZE);
     }
     else {
-      count += (2 + TAR_INT(header.size) / MAX_HEADER_SIZE);
+      c += (2 + TAR_INT(header.size) / MAX_HEADER_SIZE);
     }
   }
   return 0;
@@ -370,7 +370,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
     tar_header_t header;
-    
+
     // Move to the beginning of the archive
     lseek(tar_fd, 0, SEEK_SET);
 
@@ -394,11 +394,12 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
                     return -1;  // Error reading the file
                 }
 
-                *len = file_to_read;
-
                 if (file_to_read < file_size - offset) {
                     remaining_bytes = file_size - offset - file_to_read;
                 }
+
+                // Set len to the total number of bytes read, not just in this call
+                *len += file_to_read;
 
                 return remaining_bytes;
             } else {
@@ -408,7 +409,7 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
         }
 
         // Move to the next tar entry
-        lseek(tar_fd, (TAR_INT(header.size) + 511) / 512 * 512, SEEK_CUR);
+        lseek(tar_fd, (TAR_INT(header.size) + 511) / MAX_HEADER_SIZE * MAX_HEADER_SIZE, SEEK_CUR);
     }
 
     return -1;  // No entry found with the specified path
