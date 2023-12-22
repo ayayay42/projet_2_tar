@@ -369,37 +369,47 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
  *
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
-
-  tar_header_t header;
-
-  lseek(tar_fd, 0, SEEK_SET);
-
-  while (MAX_HEADER_SIZE == read(tar_fd, &header, MAX_HEADER_SIZE)) {
+    tar_header_t header;
     
+    // Move to the beginning of the archive
+    lseek(tar_fd, 0, SEEK_SET);
 
-    if (strcmp(header.name, path) == 0) {
-      if ( header.typeflag == '\0' || header.typeflag == '0' || header.typeflag == SYMTYPE) {
-        int file_size = TAR_INT(header.size);
-        
-        if (lseek(tar_fd, offset, SEEK_CUR) < 0) return -1;
+    while (read(tar_fd, &header, MAX_HEADER_SIZE) == MAX_HEADER_SIZE) {
+        if (strcmp(header.name, path) == 0) {
+            if (header.typeflag == '0' || header.typeflag == SYMTYPE) {
+                int file_size = TAR_INT(header.size);
 
-        if (offset > file_size) return -2;
+                if (offset > file_size) {
+                    return -2;  // Offset is outside the file total length
+                }
 
-        ssize_t file_to_read = read(tar_fd, dest, *len);
-        if (file_to_read < 0) return -1;
+                // Move to the desired offset
+                if (lseek(tar_fd, offset, SEEK_CUR) < 0) {
+                    return -1;  // Unable to seek to the specified offset
+                }
 
-        *len = file_to_read;
+                ssize_t remaining_bytes = 0;
+                ssize_t file_to_read = read(tar_fd, dest, *len);
+                if (file_to_read < 0) {
+                    return -1;  // Error reading the file
+                }
 
-        return (file_to_read < file_size - offset) ? (file_size - offset - file_to_read) : 0;
+                *len = file_to_read;
 
-      } else {
-        return -1;
-      }
+                if (file_to_read < file_size - offset) {
+                    remaining_bytes = file_size - offset - file_to_read;
+                }
+
+                return remaining_bytes;
+            } else {
+                // Handle symlink or unsupported type
+                return -1;
+            }
+        }
+
+        // Move to the next tar entry
+        lseek(tar_fd, (TAR_INT(header.size) + 511) / 512 * 512, SEEK_CUR);
     }
 
-    lseek(tar_fd, TAR_INT(header.size), 1);
-  }
-
-
-  return -1;
+    return -1;  // No entry found with the specified path
 }
