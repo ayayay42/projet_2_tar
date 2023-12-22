@@ -369,5 +369,36 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
  *
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
-    return 0;
+
+  tar_header_t header;
+
+  lseek(tar_fd, 0, SEEK_SET);
+
+  while (MAX_HEADER_SIZE == read(tar_fd, &header, MAX_HEADER_SIZE)) {
+    ssize_t file_to_read = read(tar_fd, dest, *len);
+
+    if (strcmp(header.name, path) == 0) {
+      if ( header.typeflag == '\0' || header.typeflag == SYMTYPE || header.typeflag == '0') {
+        int file_size = TAR_INT(header.size);
+        
+        if (lseek(tar_fd, offset, SEEK_CUR) < 0) return -1;
+
+        if (offset > file_size) return -2;
+        
+        if (file_to_read < 0) return -1;
+
+        *len = file_to_read;
+
+        return (file_to_read < file_size - offset) ? (file_size - offset - file_to_read) : 0;
+
+      } else {
+        return -1;
+      }
+    }
+
+    lseek(tar_fd, TAR_INT(header.size), 1);
+  }
+
+  // if we reach this point, it means the entry was not found
+  return -1;
 }
