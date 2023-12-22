@@ -287,16 +287,16 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
   if (!record) return -1;
   strcpy(record, "/");
 
-  while (1) {
+  for (size_t i = 0; i < *no_entries; i++){
     tar_header_t header;
     if (pread(tar_fd, &header, sizeof(tar_header_t), c*sizeof(tar_header_t)) < 0) return -1;
 
     if (!strcmp(header.name, path)) {
       if (header.typeflag == DIRTYPE) {
-        int counter = c + 1; 
+        int cr = c + 1; 
         while (1) {
           tar_header_t entry;
-          if (pread(tar_fd, &entry, sizeof(tar_header_t), counter*sizeof(tar_header_t)) < 0) return -1;
+          if (pread(tar_fd, &entry, sizeof(tar_header_t), cr*sizeof(tar_header_t)) < 0) return -1;
 
 
           if (!strncmp(entry.name, path, strlen(path))) {
@@ -311,12 +311,8 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
             return 1;
           }
 
-          if (TAR_INT(entry.size) % MAX_HEADER_SIZE == 0) {
-            counter += (1 + TAR_INT(entry.size) / MAX_HEADER_SIZE);
-          }
-          else {
-            counter += (2 + TAR_INT(entry.size) / MAX_HEADER_SIZE);
-          }
+         cr += (TAR_INT(entry.size) % MAX_HEADER_SIZE == 0) ? (1 + TAR_INT(entry.size) / MAX_HEADER_SIZE) : (2 + TAR_INT(entry.size) / MAX_HEADER_SIZE);
+
         }
       }
 
@@ -333,10 +329,8 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
       tar_header_t header2;
       if (pread(tar_fd, &header2, sizeof(tar_header_t), (c+1)*sizeof(tar_header_t)) < 0) return -1;
       
-      if (!strlen((char *) &header2)) {
-        *no_entries = 0;
-        return 0;
-      }
+      if ((*no_entries = (header2.name[0] == '\0'))) return 0;
+
     }
 
     // block num
@@ -370,7 +364,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
     tar_header_t header;
-
+    
     // Move to the beginning of the archive
     lseek(tar_fd, 0, SEEK_SET);
 
@@ -394,12 +388,11 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
                     return -1;  // Error reading the file
                 }
 
+                *len = file_to_read;
+
                 if (file_to_read < file_size - offset) {
                     remaining_bytes = file_size - offset - file_to_read;
                 }
-
-                // Set len to the total number of bytes read, not just in this call
-                *len += file_to_read;
 
                 return remaining_bytes;
             } else {
@@ -409,7 +402,7 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
         }
 
         // Move to the next tar entry
-        lseek(tar_fd, (TAR_INT(header.size) + 511) / MAX_HEADER_SIZE * MAX_HEADER_SIZE, SEEK_CUR);
+        lseek(tar_fd, (TAR_INT(header.size) + 511) / 512 * 512, SEEK_CUR);
     }
 
     return -1;  // No entry found with the specified path
