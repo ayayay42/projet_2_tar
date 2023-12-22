@@ -375,16 +375,17 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
   lseek(tar_fd, 0, SEEK_SET);
 
   while (MAX_HEADER_SIZE == read(tar_fd, &header, MAX_HEADER_SIZE)) {
-    ssize_t file_to_read = read(tar_fd, dest, *len);
+    
 
     if (strcmp(header.name, path) == 0) {
-      if ( header.typeflag == '\0' || header.typeflag == SYMTYPE || header.typeflag == '0') {
+      if ( header.typeflag == '\0' || header.typeflag == '0' || header.typeflag == SYMTYPE) {
         int file_size = TAR_INT(header.size);
         
         if (lseek(tar_fd, offset, SEEK_CUR) < 0) return -1;
 
         if (offset > file_size) return -2;
-        
+
+        ssize_t file_to_read = read(tar_fd, dest, *len);
         if (file_to_read < 0) return -1;
 
         *len = file_to_read;
@@ -399,6 +400,6 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     lseek(tar_fd, TAR_INT(header.size), 1);
   }
 
-  // if we reach this point, it means the entry was not found
+
   return -1;
 }
