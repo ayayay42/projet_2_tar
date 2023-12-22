@@ -25,7 +25,7 @@ void debug_dump(const uint8_t *bytes, size_t len) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) {
+    /* if (argc < 2) {
         printf("Usage: %s tar_file\n", argv[0]);
         return -1;
     }
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     if (fd == -1) {
         perror("open(tar_file)");
         return -1;
-    }
+    } */
     /*
     int ret = check_archive(fd);
     printf("check_archive returned %d\n", ret);
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     printf("is file returned %d for summer and %d for archive_3\n", is_file_summer, is_file_archive);
     */
 
-    int is_link = is_symlink(fd, "my_symlink");
-    printf("is symlink returned %d\n", is_link);
+    //int is_link = is_symlink(fd, "my_symlink");
+    //printf("is symlink returned %d\n", is_link);
     return 0;
 }

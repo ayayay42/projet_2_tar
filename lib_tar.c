@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_HEADER_SIZE 512 //512 = taille max d'un header
+
 
 /**
  * Checks whether the archive is valid.
@@ -275,76 +275,79 @@ int is_symlink(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
-    printf("\n\n\n#####\n debugging list\n");
+  int count = 0;
+  int index = 0;
 
-    char buffer[MAX_HEADER_SIZE];
-
-    long init_position = lseek(tar_fd, 0, SEEK_SET);
-
-    size_t entries_count = 0;
-
-    while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
-        printf("\nnew iteration\n");
-
-        tar_header_t * header = (tar_header_t *) buffer;
-
-        if (header->name[0] == '\0'){
-            printf("reached end\n\n");
-            lseek(tar_fd, (-1)* strlen(header->name), SEEK_CUR);
-            break;
-        }
-
-        printf("compare: %d\n\n", strcmp(header->name, path));
-        printf("path is: %s\n", path);
-        printf("header flag and name: %d, %s\n", header->typeflag, header->name);
-
-        if (strncmp(header->name, path, strlen(path)) == 0){
-            lseek(tar_fd, 0, SEEK_CUR);
-
-            if(header->typeflag == DIRTYPE){
-                printf("inside if dir\n");
-
-                lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
-
-                while (read(tar_fd, buffer, MAX_HEADER_SIZE) <= MAX_HEADER_SIZE){
-                    printf("\nnew iteration in while loop\n");
-
-                    tar_header_t * entry_header = (tar_header_t *) buffer;
-
-                    if (entry_header->name[0] == '\0'){
-                        printf("reached end\n\n");
-                        lseek(tar_fd, (-1)* strlen(entry_header->name), SEEK_CUR);
-                        break;
-                    }
-
-                    printf("compare: %d\n\n", strcmp(entry_header->name, path));
-                    printf("path is: %s\n", path);
-                    printf("header flag and name: %d, %s\n", entry_header->typeflag, entry_header->name);
-
-                    if (strncmp(header->name, path, strlen(path)) == 0 && strlen(entry_header->name) > strlen(path) && entry_header->name[strlen(path)] != '/'){
-                        strncpy(entries[entries_count], entry_header->name, strlen(entry_header->name));
-                        entries_count++;
-
-                        if (entries_count == *no_entries){
-                            lseek(tar_fd, init_position, SEEK_SET);
-                            *no_entries = entries_count;
-                            return entries_count;
-                        }
-                        
-                    }
-                    lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
-                }
-            }
-            lseek(tar_fd, init_position, SEEK_SET);
-
-            *no_entries = entries_count;
-            return entries_count;
-        }
-
-        lseek(tar_fd, MAX_HEADER_SIZE - sizeof(buffer), SEEK_CUR);
-    }
-    printf("outside while\n");
+  if (!is_dir(tar_fd, path) && !is_symlink(tar_fd, path)) {
+    *no_entries = 0;
     return 0;
+  }
+
+  char *record = malloc(100);
+  if (!record) return -1;
+  strcpy(record, "/");
+
+  while (1) {
+    tar_header_t header;
+    if (pread(tar_fd, &header, sizeof(tar_header_t), count*sizeof(tar_header_t)) < 0) return -1;
+
+    if (!strcmp(header.name, path)) {
+      if (header.typeflag == DIRTYPE) {
+        int counter = count + 1; 
+        while (1) {
+          tar_header_t entry;
+          if (pread(tar_fd, &entry, sizeof(tar_header_t), counter*sizeof(tar_header_t)) < 0) return -1;
+
+
+          if (!strncmp(entry.name, path, strlen(path))) {
+            if (strncmp(entry.name, record, strlen(record))) {
+              memcpy(entries[index], entry.name, strlen(entry.name));
+              index++;
+              strcpy(record, entry.name); 
+            }
+          }
+          else if (!(header.typeflag == LNKTYPE || header.typeflag == SYMTYPE)) {
+            *no_entries = index;
+            return 1;
+          }
+
+          if (TAR_INT(entry.size) % MAX_HEADER_SIZE == 0) {
+            counter += (1 + TAR_INT(entry.size) / MAX_HEADER_SIZE);
+          }
+          else {
+            counter += (2 + TAR_INT(entry.size) / MAX_HEADER_SIZE);
+          }
+        }
+      }
+
+      else if (header.typeflag == LNKTYPE || header.typeflag == SYMTYPE) {
+        if (is_file(tar_fd, header.linkname + 2)) {
+          return list(tar_fd, header.linkname + 2, entries, no_entries);
+        }
+        return list(tar_fd, strcat(header.linkname, "/") + 2, entries, no_entries);
+      }
+    }
+
+    // tar end
+    if (!strlen((char *) &header)) {
+      tar_header_t header2;
+      if (pread(tar_fd, &header2, sizeof(tar_header_t), (count+1)*sizeof(tar_header_t)) < 0) return -1;
+      
+      if (!strlen((char *) &header2)) {
+        *no_entries = 0;
+        return 0;
+      }
+    }
+
+    // block num
+    if (TAR_INT(header.size) % MAX_HEADER_SIZE == 0) {
+      count += (1 + TAR_INT(header.size) / MAX_HEADER_SIZE);
+    }
+    else {
+      count += (2 + TAR_INT(header.size) / MAX_HEADER_SIZE);
+    }
+  }
+  return 0;
 }
 
 /**

@@ -34,6 +34,8 @@ typedef struct posix_header
 #define TVERSION "00"           /* 00 and no null */
 #define TVERSLEN 2
 
+#define MAX_HEADER_SIZE 512 //512 = taille max d'un header
+
 /* Values used in typeflag field.  */
 #define REGTYPE  '0'            /* regular file */
 #define AREGTYPE '\0'           /* regular file */
